@@ -4,7 +4,16 @@
 
 package frc.robot;
 
+import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
+
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim.KitbotGearing;
+import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim.KitbotMotor;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
@@ -16,7 +25,12 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
  */
 public class Robot extends TimedRobot {
   private Command m_autonomousCommand;
-
+  WPI_TalonSRX masterRight = new WPI_TalonSRX(15);
+  WPI_VictorSPX slaveRight = new WPI_VictorSPX(14);
+  WPI_TalonSRX masterLeft = new WPI_TalonSRX(13);
+  WPI_VictorSPX slaveLeft = new WPI_VictorSPX(12);
+  PIDController pid;
+  ProfiledPIDController prfPid;
   private RobotContainer m_robotContainer;
 
   /**
@@ -28,11 +42,28 @@ public class Robot extends TimedRobot {
     // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
     // autonomous chooser on the dashboard.
     m_robotContainer = new RobotContainer();
+    slaveRight.follow(masterRight);
+    slaveLeft.follow(masterLeft);
+
+    
+    masterLeft.setInverted(true);
+    slaveLeft.setInverted(true);
+    masterRight.setSensorPhase(true);
+    double kp = 0.00024;
+    double ki = 0;
+    double kd = 0.0001;
+    // pid = new PIDController(kp, ki, kd);
+    // pid.setIntegratorRange(minimumIntegral, maximumIntegral);
+    Constraints constr = new Constraints(700,160);
+    prfPid = new ProfiledPIDController(kp, ki, kd, constr);
+
+    
+    
   }
 
   /**
-   * This function is called every robot packet, no matter the mode. Use this for items like
-   * diagnostics that you want ran during disabled, autonomous, teleoperated and test.
+   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
+   * that you want ran during disabled, autonomous, teleoperated and test.
    *
    * <p>This runs after the mode specific periodic functions, but before LiveWindow and
    * SmartDashboard integrated updating.
@@ -70,6 +101,10 @@ public class Robot extends TimedRobot {
 
   @Override
   public void teleopInit() {
+    pid.setSetpoint(6000);
+    State goal = new State(4000, 0);
+    prfPid.setGoal(goal);
+    masterRight.setSelectedSensorPosition(0);
     // This makes sure that the autonomous stops running when
     // teleop starts running. If you want the autonomous to
     // continue until interrupted by another command, remove
@@ -81,7 +116,22 @@ public class Robot extends TimedRobot {
 
   /** This function is called periodically during operator control. */
   @Override
-  public void teleopPeriodic() {}
+  public void teleopPeriodic() {
+    
+    // System.out.println(masterRight.getSelectedSensorPosition());
+    System.out.println("Profiled ouput:");
+    System.out.println(prfPid.calculate(masterRight.getSelectedSensorPosition()));
+    System.out.println("///////////");
+    // System.out.println("PID ouput:");
+    // System.out.println(pid.calculate(masterRight.getSelectedSensorPosition()));
+    // System.out.println("///////////");
+    System.out.println("Encoder position:");
+    System.out.println(masterRight.getSelectedSensorPosition());
+    // masterRight.set(pid.calculate(masterRight.getSelectedSensorPosition()));
+    masterRight.set(prfPid.calculate(masterRight.getSelectedSensorPosition()));
+    // masterLeft.set(pid.calculate(masterRight.getSelectedSensorPosition()));
+    masterLeft.set(prfPid.calculate(masterRight.getSelectedSensorPosition()));
+  }
 
   @Override
   public void testInit() {
@@ -92,4 +142,12 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {}
+
+  /** This function is called once when the robot is first started up. */
+  @Override
+  public void simulationInit() {}
+
+  /** This function is called periodically whilst in simulation. */
+  @Override
+  public void simulationPeriodic() {}
 }
